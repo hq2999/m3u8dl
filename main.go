@@ -165,6 +165,8 @@ func main() {
 	file_count_ = file_count
 	ext_name = m3u8_struct.ext_name
 
+	fmt.Printf("media_type: %s\n", ext_name)
+
 	if limit > 0 {
 		resource_list = resource_list[0:limit]
 		file_count_ = limit
