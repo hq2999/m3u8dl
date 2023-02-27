@@ -73,12 +73,8 @@ func main() {
 	flag.Parse()
 
 	if m3u8_url == "" {
-		if len(os.Args) == 1 {
-			fmt.Printf("example: download_m3u8 https://......m3u8, more info: download_m3u8 -h")
-			return
-		} else {
-			m3u8_url = os.Args[1]
-		}
+		fmt.Printf("example: m3u8dl -url=https://......m3u8, more info: m3u8dl -h")
+		return
 	}
 
 	fmt.Printf("m3u8's url: %s\n", m3u8_url)
