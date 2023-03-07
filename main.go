@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -17,9 +18,9 @@ import (
 )
 
 const (
-	FILE int = 0
-	URL  int = 1
-	TAIL int = 2
+	ABSOLUTE int = 0
+	URL      int = 1
+	RELATIVE int = 2
 )
 
 const (
@@ -54,11 +55,17 @@ var (
 	output        string
 	timeout       int
 	limit         int
+	proxy         string
 )
 
 var (
 	downloaded_count int = 0
 	file_count_      int = 0
+)
+
+var (
+	m3u8_long_url  string = ""
+	m3u8_short_url string = ""
 )
 
 func main() {
@@ -69,6 +76,7 @@ func main() {
 	flag.StringVar(&output, "output", "output", "output filename")
 	flag.IntVar(&timeout, "timeout", 15, "http timeout (second)")
 	flag.IntVar(&limit, "limit", 0, "download file count limit")
+	flag.StringVar(&proxy, "proxy", "", "proxy url")
 
 	flag.Parse()
 
@@ -83,6 +91,25 @@ func main() {
 	fmt.Printf("output filename: %s\n", output)
 	fmt.Printf("timeout: %d(s)\n", timeout)
 
+	hc = &http.Client{
+		Timeout: time.Duration(timeout) * time.Second,
+	}
+
+	if len(proxy) > 0 {
+		fmt.Printf("proxy: %s\n", proxy)
+		proxyURL, err := url.Parse(proxy)
+
+		if err != nil {
+			panic(err)
+		}
+
+		tansport := &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		}
+
+		hc.Transport = tansport
+	}
+
 	if limit == 0 {
 		fmt.Println("download file count limit: max")
 	} else {
@@ -91,13 +118,9 @@ func main() {
 
 	fmt.Println("--------------------")
 
-	hc = &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
-	}
-
 	m3u8_url_struct := get_url_struct(m3u8_url)
-	m3u8_long_url := m3u8_url_struct.header + "://" + m3u8_url_struct.long_url
-	m3u8_short_url := m3u8_url_struct.header + "://" + m3u8_url_struct.short_url
+	m3u8_long_url = m3u8_url_struct.header + "://" + m3u8_url_struct.long_url
+	m3u8_short_url = m3u8_url_struct.header + "://" + m3u8_url_struct.short_url
 
 	resp, err := hc.Get(m3u8_url)
 	if err != nil {
@@ -126,12 +149,12 @@ func main() {
 		url_struct := get_url_struct(m3u8_struct.resource_list[0])
 		url_type := url_struct.url_type
 		url := ""
-		if url_type == FILE {
+		if url_type == RELATIVE {
 			url = m3u8_long_url + "/" + m3u8_struct.resource_list[0]
 		} else if url_type == URL {
 			url = m3u8_struct.resource_list[0]
-		} else if url_type == TAIL {
-			url = m3u8_short_url + "/" + m3u8_struct.resource_list[0]
+		} else if url_type == ABSOLUTE {
+			url = m3u8_short_url + m3u8_struct.resource_list[0]
 		}
 
 		resp, err := hc.Get(url)
@@ -187,12 +210,12 @@ func main() {
 		file_name := line_struct.file_name
 
 		url := ""
-		if url_type == FILE {
+		if url_type == RELATIVE {
 			url = m3u8_long_url + "/" + body
 		} else if url_type == URL {
 			url = body
-		} else if url_type == TAIL {
-			url = m3u8_short_url + "/" + body
+		} else if url_type == ABSOLUTE {
+			url = m3u8_short_url + body
 		}
 		ch_valve <- true
 		go download_file(ix, url, video_map, file_name, 0, ch_valve, m3u8_struct.encrypt_key)
@@ -293,10 +316,10 @@ func get_url_struct(url string) UrlStruct {
 
 	if strings.HasPrefix(url, "http") {
 		res.url_type = URL
-	} else if strings.Count(url, "/") == 0 {
-		res.url_type = FILE
-	} else if strings.Count(url, "/") >= 0 {
-		res.url_type = TAIL
+	} else if strings.HasPrefix(url, "/") {
+		res.url_type = ABSOLUTE
+	} else if !strings.HasPrefix(url, "/") {
+		res.url_type = RELATIVE
 	}
 
 	re := regexp.MustCompile(`^https?://`)
@@ -318,7 +341,6 @@ func get_resource_list(content []string) []string {
 	var res []string
 	for _, item := range content {
 		if !strings.HasPrefix(item, "#") {
-			item = strings.TrimPrefix(item, "/")
 			res = append(res, item)
 		}
 	}
@@ -371,6 +393,14 @@ func get_key(content []string) (string, []byte) {
 			groups = re_url.FindStringSubmatch(item)
 			if len(groups) == 2 {
 				encrypt_url := groups[1]
+				encrypt_url_struct := get_url_struct(encrypt_url)
+
+				if encrypt_url_struct.url_type == RELATIVE {
+					encrypt_url = m3u8_long_url + "/" + encrypt_url
+				} else if encrypt_url_struct.url_type == ABSOLUTE {
+					encrypt_url = m3u8_short_url + encrypt_url
+				}
+
 				resp, err := hc.Get(encrypt_url)
 				if err != nil {
 					panic(err)
