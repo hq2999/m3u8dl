@@ -421,6 +421,12 @@ func get_key(content []string) (string, []byte) {
 }
 
 func AES_CBC_Decrypt(data []byte, key []byte) []byte {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println("decrypt error")
+		}
+	}()
+
 	block, _ := aes.NewCipher(key)
 	blockSize := block.BlockSize()
 	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize])
