@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	proxy_ "golang.org/x/net/proxy"
 )
 
 const (
@@ -90,24 +92,43 @@ func main() {
 	fmt.Printf("task count: %d\n", task_count)
 	fmt.Printf("output filename: %s\n", output)
 	fmt.Printf("timeout: %d(s)\n", timeout)
+	fmt.Printf("proxy: %s\n", proxy)
 
 	hc = &http.Client{
 		Timeout: time.Duration(timeout) * time.Second,
 	}
 
 	if len(proxy) > 0 {
-		fmt.Printf("proxy: %s\n", proxy)
-		proxyURL, err := url.Parse(proxy)
 
-		if err != nil {
-			panic(err)
+		if strings.HasPrefix(proxy, "http") {
+			fmt.Printf("proxy: %s\n", proxy)
+			proxyURL, err := url.Parse(proxy)
+
+			if err != nil {
+				panic(err)
+			}
+
+			tansport := &http.Transport{
+				Proxy: http.ProxyURL(proxyURL),
+			}
+
+			hc.Transport = tansport
 		}
 
-		tansport := &http.Transport{
-			Proxy: http.ProxyURL(proxyURL),
+		if strings.HasPrefix(proxy, "socks5") {
+			proxy = proxy[9:]
+			dialer, err := proxy_.SOCKS5("tcp", proxy, nil, proxy_.Direct)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "can't connect to the proxy:", err)
+				os.Exit(1)
+			}
+			// setup a http client
+			httpTransport := &http.Transport{}
+			hc = &http.Client{Transport: httpTransport}
+			// set our socks5 as the dialer
+			httpTransport.Dial = dialer.Dial
 		}
 
-		hc.Transport = tansport
 	}
 
 	if limit == 0 {
