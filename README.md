@@ -1,5 +1,5 @@
-# m3u8dl
-m3u8 downloader
+# m3u8 downloader
+
 
 An M3U8 link download tool
 
