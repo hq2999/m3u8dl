@@ -26,5 +26,5 @@ m3u8dl -url=https://......m3u8 -proxy=https://127.0.0.1:1234
 - more info: 
 
 ```bash
-- m3u8dl -h
+m3u8dl -h
 ```
