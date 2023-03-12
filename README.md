@@ -4,7 +4,10 @@
 An M3U8 link download tool
 
 - example：
+
+```bash
 m3u8dl -url=https://......m3u8
+```
 
 
 ---
