@@ -283,7 +283,7 @@ func create_file(output_filename string, video_map *sync.Map, video_filename_lis
 func download_file(ix int, url string, video_map *sync.Map, key string, count int, ch_valve chan bool, encrypt_key []byte) {
 BEGIN:
 	resp, err := hc.Get(url)
-	if err != nil {
+	if err != nil || resp.StatusCode != 200 {
 		fmt.Println(err)
 		count++
 
