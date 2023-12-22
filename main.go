@@ -178,6 +178,8 @@ func main() {
 			url = m3u8_short_url + m3u8_struct.resource_list[0]
 		}
 
+		url = strings.Replace(url, "\r", "", 1)
+		
 		resp, err := hc.Get(url)
 		if err != nil {
 			panic(err)
